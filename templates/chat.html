@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AI Mate</title>
+  <title>AI Mate Chat</title>
   <style>
     body {
       margin: 0;
-      padding: 0;
       font-family: Arial, sans-serif;
-      background: #f0f0f0;
+      background-color: #ece5dd;
       display: flex;
       flex-direction: column;
       height: 100vh;
@@ -22,72 +21,119 @@
       flex-direction: column;
     }
 
-    .message {
+    .date-label {
+      align-self: center;
+      background-color: #d9fdd3;
+      padding: 6px 12px;
+      border-radius: 10px;
       margin: 10px 0;
-      padding: 10px 15px;
-      border-radius: 12px;
+      font-size: 0.9em;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .message {
       max-width: 70%;
-      word-wrap: break-word;
+      margin: 5px 0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.4;
+      position: relative;
     }
 
     .user {
-      background-color: #dcf8c6;
       align-self: flex-end;
-      text-align: right;
+      background-color: #dcf8c6;
+      border-bottom-right-radius: 0;
     }
 
     .ai {
-      background-color: #ffffff;
       align-self: flex-start;
-      text-align: left;
+      background-color: #ffffff;
+      border-bottom-left-radius: 0;
     }
 
     .timestamp {
-      font-size: 0.75em;
-      color: #666;
+      font-size: 10px;
+      color: #555;
       margin-top: 5px;
+      text-align: right;
+    }
+
+    .typing {
+      font-style: italic;
+      color: #777;
+    }
+
+    .dots::after {
+      content: '';
+      animation: dots 1.2s steps(3, end) infinite;
+    }
+
+    @keyframes dots {
+      0% { content: ''; }
+      33% { content: '.'; }
+      66% { content: '..'; }
+      100% { content: '...'; }
     }
 
     .input-area {
       display: flex;
       padding: 10px;
+      background-color: #f0f0f0;
       border-top: 1px solid #ccc;
-      background: #fff;
     }
 
     input[type="text"] {
       flex: 1;
       padding: 10px;
-      border: 1px solid #ccc;
       border-radius: 20px;
-      font-size: 16px;
+      border: 1px solid #ccc;
+      font-size: 14px;
     }
 
     button {
+      padding: 10px 16px;
       margin-left: 10px;
-      padding: 10px 15px;
-      border: none;
       border-radius: 20px;
-      background: #128c7e;
+      border: none;
+      background-color: #128c7e;
       color: white;
-      font-size: 16px;
+      font-weight: bold;
       cursor: pointer;
     }
   </style>
 </head>
 <body>
   <div class="chat-box" id="chatBox">
+    {% set last_date = None %}
     {% for user, ai, timestamp in chat_history %}
-    <div class="message user">
-      {{ user }}
-      <div class="timestamp">{{ timestamp }}</div>
-    </div>
-    <div class="message ai">
-      {{ ai }}
-      <div class="timestamp">{{ timestamp }}</div>
-    </div>
-  {% endfor %}
-  
+      {% set ts = timestamp | todatetime %}
+      {% set date_str = ts.strftime('%Y-%m-%d') %}
+      {% set time_str = ts.strftime('%I:%M %p') %}
+      {% if date_str != last_date %}
+        <div class="date-label">
+          {% if date_str == now.strftime('%Y-%m-%d') %}
+            Today
+          {% elif date_str == (now - timedelta(days=1)).strftime('%Y-%m-%d') %}
+            Yesterday
+          {% else %}
+            {{ ts.strftime('%d %b %Y') }}
+          {% endif %}
+        </div>
+        {% set last_date = date_str %}
+      {% endif %}
+
+      <div class="message user">
+        {{ user }}
+        <div class="timestamp">{{ time_str }}</div>
+      </div>
+      <div class="message ai">
+        {{ ai }}
+        <div class="timestamp">{{ time_str }}</div>
+      </div>
+    {% endfor %}
   </div>
 
   <div class="input-area">
@@ -99,11 +145,32 @@
     const chatBox = document.getElementById('chatBox');
     const input = document.getElementById('messageInput');
 
+    function scrollToBottom() {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function formatTime(date) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
     async function sendMessage() {
       const message = input.value.trim();
       if (!message) return;
 
-      addMessage(message, 'user');
+      const now = new Date();
+      const timeStr = formatTime(now);
+
+      const userMsg = document.createElement('div');
+      userMsg.className = 'message user';
+      userMsg.innerHTML = `${message}<div class="timestamp">${timeStr}</div>`;
+      chatBox.appendChild(userMsg);
+
+      const typing = document.createElement('div');
+      typing.className = 'message ai typing';
+      typing.innerHTML = '<span class="dots">Typing</span>';
+      chatBox.appendChild(typing);
+      scrollToBottom();
+
       input.value = '';
 
       const response = await fetch('/chat', {
@@ -113,20 +180,21 @@
       });
 
       const data = await response.json();
-      addMessage(data.response, 'ai');
-    }
+      chatBox.removeChild(typing);
 
-    function addMessage(text, sender) {
-      const div = document.createElement('div');
-      div.className = 'message ' + sender;
-      div.innerText = text;
-      chatBox.appendChild(div);
-      chatBox.scrollTop = chatBox.scrollHeight;
+      const aiMsg = document.createElement('div');
+      aiMsg.className = 'message ai';
+      aiMsg.innerHTML = `${data.response}<div class="timestamp">${formatTime(new Date(data.timestamp))}</div>`;
+      chatBox.appendChild(aiMsg);
+
+      scrollToBottom();
     }
 
     input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') sendMessage();
     });
+
+    window.onload = scrollToBottom;
   </script>
 </body>
 </html>

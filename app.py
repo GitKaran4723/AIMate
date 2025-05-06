@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template
-from datetime import datetime
+from datetime import datetime, timedelta
 import sqlite3
 import os
 from dotenv import load_dotenv
@@ -36,7 +36,8 @@ def fetch_full_conversation():
 def index():
     # Load past chat for the frontend
     past_chats = fetch_full_conversation()
-    return render_template('chat.html', chat_history=past_chats)
+    now = datetime.now()
+    return render_template('chat.html', chat_history=past_chats, now=now, timedelta=timedelta)
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -97,6 +98,10 @@ def history():
     return jsonify([
         {"id": r[0], "user_message": r[1], "ai_response": r[2], "timestamp": r[3]} for r in rows
     ])
+
+@app.template_filter('todatetime')
+def to_datetime_filter(value):
+    return datetime.fromisoformat(value)
 
 if __name__ == '__main__':
     init_db()
